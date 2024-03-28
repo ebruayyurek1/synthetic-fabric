@@ -1,92 +1,3 @@
-"""
-import random
-import csv
-from PIL import Image, ImageDraw
-import numpy as np
-
-# Read the logo image
-logo = Image.open('/Users/ebruayyurek/Documents/synthetic_image/data/input/instagram.png')
-
-# Define grid dimensions
-rows = 10
-cols = 10
-
-# Cell size
-cell_width = logo.width
-cell_height = logo.height
-spacing = 50  # distance between logos
-
-# Canvas size
-canvas_width = cols * (cell_width + spacing) - spacing
-canvas_height = rows * (cell_height + spacing) - spacing
-
-# Transformation percentages
-translation_percentage = 0.1  # 10% translation
-rotation_percentage = 0.03  # 10% rotation
-scale_percentage = 0.1  # 10% scaling
-
-# Gaussian noise parameters
-mean = 0
-stddev = 25  # Adjust stddev as needed
-
-# Create a blank canvas with a white background
-background = Image.new('RGBA', (canvas_width, canvas_height), (255, 255, 255, 255))
-
-# Lists to store center points before and after transformations
-center_points_before = []
-center_points_after = []
-
-# Putting logos onto the canvas with random transformations
-for i in range(rows):
-    for j in range(cols):
-        # Calculate initial position for each logo (here is centered!)
-        x_center_before = j * (cell_width + spacing) + (cell_width) // 2
-        y_center_before = i * (cell_height + spacing) + (cell_height) // 2
-
-        # Generate random transformations
-        tx = random.uniform(-translation_percentage * cell_width, translation_percentage * cell_width)
-        ty = random.uniform(-translation_percentage * cell_height, translation_percentage * cell_height)
-        angle = random.uniform(-rotation_percentage * 360, rotation_percentage * 360)
-        scale_factor = random.uniform(1 - scale_percentage, 1 + scale_percentage)
-
-        # Apply transformations
-        translated_logo = logo.transform(logo.size, Image.AFFINE, (1, 0, tx, 0, 1, ty))
-        rotated_and_scaled_logo = translated_logo.rotate(angle, expand=True).resize(
-            (int(logo.width * scale_factor), int(logo.height * scale_factor)))
-
-        # Paste the transformed logo onto the canvas
-        x_offset = j * (cell_width + spacing) + (cell_width - rotated_and_scaled_logo.width) // 2
-        y_offset = i * (cell_height + spacing) + (cell_height - rotated_and_scaled_logo.height) // 2
-        background.paste(rotated_and_scaled_logo, (x_offset, y_offset), rotated_and_scaled_logo)
-
-        # Calculate center points after transformations
-        x_center_after = x_offset + rotated_and_scaled_logo.width // 2
-        y_center_after = y_offset + rotated_and_scaled_logo.height // 2
-
-        # Append center points to the lists
-        center_points_before.append((x_center_before, y_center_before))
-        center_points_after.append((x_center_after, y_center_after))
-
-# Apply Gaussian noise to the final image
-img_array = np.array(background)
-noise = np.random.normal(mean, stddev, img_array.shape[:-1])
-noisy_background = Image.fromarray(np.uint8(np.clip(img_array + noise[:, :, np.newaxis], 0, 255)))
-
-# Save center points to CSV files
-with open('center_points_before.csv', 'w', newline='') as f:
-    writer = csv.writer(f)
-    writer.writerow(['X', 'Y'])
-    writer.writerows(center_points_before)
-
-with open('center_points_after.csv', 'w', newline='') as f:
-    writer = csv.writer(f)
-    writer.writerow(['X', 'Y'])
-    writer.writerows(center_points_after)
-
-# Save the background image with logos
-noisy_background.save('/Users/ebruayyurek/Documents/synthetic_image/data/output/result_all_noisy.png')
-
-"""
 import random
 import csv
 from PIL import Image
@@ -113,7 +24,7 @@ canvas_height = rows * (cell_height + spacing) - spacing
 
 # Transformation percentages
 translation_percentage = 0.1  # 10% translation
-rotation_percentage = 0.03  # 10% rotation
+rotation_percentage = 0.03  # 3% rotation
 scale_percentage = 0.01  # 10% scaling
 
 # Create a blank canvas with a white background
