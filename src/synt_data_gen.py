@@ -89,9 +89,16 @@ for i in range(rows):
         # Store the center points before and after translation
         center_points_before.append((x_center_before, y_center_before))
         center_points_after.append((x_center_after, y_center_after))
+"""
+# Save center points before and after transformations to CSV file
+with open('center_points_before_after.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(['X Before', 'Y Before', 'X After', 'Y After'])
+    for i in range(len(center_points_before)):
+        writer.writerow([center_points_before[i][0], center_points_before[i][1],
+                         center_points_after[i][0], center_points_after[i][1]])
 
-
-
+"""
 # save the final image with transformed logos
 background.save('/Users/ebruayyurek/PycharmProjects/syntetic_fabric/data/output/final_image_withnoise.png')
 
