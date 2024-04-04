@@ -42,6 +42,7 @@ class CanvasParameters:
         # Background
         self.bg_color = parameters_dict["bg_color"]
         self.bg_texture = parameters_dict["bg_texture"]
+        self.use_texture = parameters_dict["use_texture"]
 
 
 def generate_coordinates(width, height, width_intervals, height_intervals):
@@ -83,16 +84,17 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
     canvas_height: int = c_params.rows * (cell_height + c_params.spacing) - c_params.spacing
 
     # A blank canvas with either a parameter defined color background or repeated texture
-    bg = Image.open(f"data/textures/{c_params.bg_texture}")
-    bg_w, bg_h = bg.size
+
     original_canvas: PILImage = Image.new('RGBA', (canvas_width, canvas_height),
                                           tuple(c_params.bg_color))
-
-    # Iterate through a grid, to place the background tile
-    for i in range(0, canvas_width, bg_w):
-        for j in range(0, canvas_height, bg_h):
-            # paste the image at location i, j:
-            original_canvas.paste(bg, (i, j))
+    if c_params.use_texture:
+        bg = Image.open(f"data/textures/{c_params.bg_texture}")
+        bg_w, bg_h = bg.size
+        # Iterate through a grid, to place the background tile
+        for i in range(0, canvas_width, bg_w):
+            for j in range(0, canvas_height, bg_h):
+                # paste the image at location i, j:
+                original_canvas.paste(bg, (i, j))
     background = original_canvas.copy()
     # List to store center points before and after transformations
     center_points_before: list = []
