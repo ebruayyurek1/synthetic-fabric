@@ -1,10 +1,12 @@
 rows: 6
 cols: 15
 spacing: 50
+interval_skew_fraction: 0.5
 
 logo_side_resize: 256
-translation_factor: 0.1
-rotation_factor: 0.03
+transform_prob: 0.25
+translation_factor: 0.05 # % of width / height
+rotation_factor: 0.01 # of 360° = max angle 3.6°
 scale_factor: 0.01
 
 # Gaussian noise parameters(basically mean and std)
