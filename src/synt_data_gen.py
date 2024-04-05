@@ -82,8 +82,8 @@ def make_background(c_params, logo):
         cell_height: int = logo.height
     # Dimension of entire canvas
     # Each dimension has spacing between each image (but not at the end) (+1 for image 0)
-    canvas_width: int = c_params.cols * (cell_width + c_params.spacing) - c_params.spacing
-    canvas_height: int = c_params.rows * (cell_height + c_params.spacing) - c_params.spacing
+    canvas_width: int = (c_params.cols + 1) * (cell_width + c_params.spacing) - c_params.spacing
+    canvas_height: int = (c_params.rows + 1) * (cell_height + c_params.spacing) - c_params.spacing
     # A blank canvas with either a parameter defined color background or repeated texture
     original_canvas: Image.Image = Image.new('RGBA', (canvas_width, canvas_height),
                                              tuple(c_params.bg_color))
@@ -101,7 +101,7 @@ def make_background(c_params, logo):
 def add_centered_gaussian_noise(image, center_x, center_y, shape: tuple[int, int],
                                 noise_amount: float = 100.0):
     # TODO: arbitrary
-    sigma = sum(shape) / 8
+    sigma = sum(shape) / 5
     logo_width, logo_height = shape
     tx = np.random.uniform(- logo_width / 3, logo_width / 3)
     ty = np.random.uniform(- logo_height / 3, logo_height / 3)
@@ -259,7 +259,7 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
 
 def main():
     base_path: Path = Path('data')
-    img_names: list[str] = ['instagram_logo.png', 'starbucks_logo.png', 'CocaCola_logo.png']
+    img_names: list[str] = ['tucano.png', 'instagram_logo.png', 'starbucks_logo.png', 'CocaCola_logo.png']
     for img_name in img_names:
         canvas_params = CanvasParameters(base_path / 'input' / 'parameters.yaml')
         times = []
