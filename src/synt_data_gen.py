@@ -4,10 +4,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from PIL import Image
-from PIL.Image import Image as PILImage, Resampling
 
 from src.utils.img_utils import calculate_aspect_ratio_fit
 from src.utils.io_utils import load_yaml
+
+
+# import torch
 
 
 class CanvasParameters:
@@ -67,7 +69,7 @@ def generate_coordinates(width: int, height: int,
 def make_background(c_params, logo):
     if c_params.logo_side != -1:
         cell_width, cell_height = calculate_aspect_ratio_fit(logo.width, logo.height, c_params.logo_side)
-        logo: PILImage = logo.resize((cell_width, cell_height))
+        logo: Image.Image = logo.resize((cell_width, cell_height))
     else:
         cell_width: int = logo.width
         cell_height: int = logo.height
@@ -76,8 +78,8 @@ def make_background(c_params, logo):
     canvas_width: int = c_params.cols * (cell_width + c_params.spacing) - c_params.spacing
     canvas_height: int = c_params.rows * (cell_height + c_params.spacing) - c_params.spacing
     # A blank canvas with either a parameter defined color background or repeated texture
-    original_canvas: PILImage = Image.new('RGBA', (canvas_width, canvas_height),
-                                          tuple(c_params.bg_color))
+    original_canvas: Image.Image = Image.new('RGBA', (canvas_width, canvas_height),
+                                             tuple(c_params.bg_color))
     if c_params.use_texture:
         bg = Image.open(f"data/textures/{c_params.bg_texture}")
         bg_w, bg_h = bg.size
@@ -89,12 +91,39 @@ def make_background(c_params, logo):
     return cell_height, cell_width, logo, original_canvas
 
 
+def add_centered_gaussian_noise(image, center_x, center_y, shape: tuple[int, int],
+                                noise_amount: float = 100.0):
+    # TODO: arbitrary
+    sigma = sum(shape) / 10
+    logo_width, logo_height = shape
+    tx = np.random.uniform(- logo_width / 3, logo_width / 3)
+    ty = np.random.uniform(- logo_height / 3, logo_height / 3)
+    image_array = np.array(image)
+    # --- Calculate distances ---
+    x_indices, y_indices = np.meshgrid(np.arange(image.height), np.arange(image.width), indexing='ij')
+    y_coord, x_coord = center_x + tx, center_y + ty
+    squared_dist = (x_indices - x_coord) ** 2 + (y_indices - y_coord) ** 2
+    gaussian_shape = np.exp(-squared_dist / (2 * sigma ** 2))
+    # --- Create noise ---
+    noise = np.random.normal(scale=noise_amount, size=image.size[::-1]) * gaussian_shape
+    repeated_arr = np.repeat(noise[:, :, np.newaxis], 3, axis=2)
+    alpha_arr = np.ones((noise.shape[0], noise.shape[1], 1)) * 255
+    noise = np.concatenate((repeated_arr, alpha_arr), axis=2)
+    noisy_image_array = image_array + noise
+
+    # Clip values within range
+    noisy_image_array = np.clip(noisy_image_array, 0, 255)
+    noisy_image = Image.fromarray(noisy_image_array.astype(np.uint8))
+    return noisy_image
+
+
 def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
+    # Note: all of these work on ints, not floating points.
     # Base path and image path
     base_output_path: Path = main_folder / 'output'
     image_path: Path = (main_folder / 'input' / input_img_name)
     # Load image
-    logo: PILImage = Image.open(main_folder / 'input' / input_img_name).convert('RGBA')
+    logo: Image.Image = Image.open(main_folder / 'input' / input_img_name).convert('RGBA')
     # Create output folder
     logo_output_path: Path = base_output_path / image_path.stem
     logo_output_path.mkdir(parents=True, exist_ok=True)
@@ -122,9 +151,6 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
     unaltered_canvas_path.parent.mkdir(exist_ok=True, parents=True)
     original_canvas.save(unaltered_canvas_path)
     # ------------------------------------------------------------------------
-    # Generate random Gaussian noise amounts
-    noise_amounts: np.ndarray = np.random.uniform(c_params.min_noise, c_params.max_noise,
-                                                  len(top_left_corners_before))
     # Generate random transformations
     # --- Translation ---
     t_f: float = c_params.translation_factor
@@ -138,71 +164,63 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
     scale_factors: np.ndarray = np.random.uniform(1 - s_f, 1 + s_f, len(top_left_corners_before))
     # --- Probabilities ---
     p_t, p_r, p_s, p_n = np.random.uniform(0, 1, 4)
-
+    # Generate random Gaussian noise amounts
+    noise_amounts: np.ndarray[float] = np.random.uniform(c_params.min_noise, c_params.max_noise,
+                                                  len(top_left_corners_before))
     for idx, (x_tl, y_tl) in enumerate(top_left_corners_before):
-        # Gaussian noise to the logo
-        # TODO: do on entire image rather than box
-        # TODO: So basically just better to apply to image coordinates after it has been pasted
-        # TODO: So just on 'background'
-        # TODO: First, find how to do it in a gaussian fashion
-        # TODO: Then apply it on centers and random translation
-        # --- NOISE ---
-        if p_n >= 1 - c_params.transform_prob:
-            # Additive probability to ensure it happens
-            p_n += np.random.uniform(0, 1)
-            pixels: np.ndarray = np.array(logo)
-            noise: np.ndarray = np.random.normal(0, noise_amounts[idx], pixels.shape).astype(np.uint8)
-            # Ensures that the pixel values stay within the valid range (inclusive).
-            noisy_pixels: np.ndarray = np.clip(pixels + noise, 0, 255).astype(np.uint8)
-            noisy_logo: PILImage = Image.fromarray(noisy_pixels, 'RGBA')
-        else:
-            # Reset probability to a random value
-            p_n = np.random.uniform(0, 1)
-            noisy_logo = logo
-
         # Random transformations
         # --- ROTATE ---
         if p_r >= 1 - c_params.transform_prob:
-            # Additive probability to ensure it happens
-            p_r += np.random.uniform(0, 1)
-            rotated_logo: PILImage = noisy_logo.rotate(angles[idx], expand=True)
-        else:
             # Reset probability to a random value
             p_r = np.random.uniform(0, 1)
-            rotated_logo = noisy_logo
+            rotated_logo: Image.Image = logo.rotate(angles[idx], expand=True)
+        else:
+            # Additive probability to ensure it happens
+            p_r += np.random.uniform(0, 1)
+            rotated_logo: Image.Image = logo
         # ---  SCALE ---
         if p_s >= 1 - c_params.transform_prob:
-            # Additive probability to ensure it happens
-            p_s += np.random.uniform(0, 1)
-            scaled_logo = rotated_logo.resize(
-                (round(rotated_logo.width * scale_factors[idx]), round(rotated_logo.height * scale_factors[idx])),
-                resample=Resampling.LANCZOS)
-        else:
             # Reset probability to a random value
             p_s = np.random.uniform(0, 1)
-            scaled_logo = rotated_logo
+            scaled_logo: Image.Image = rotated_logo.resize(
+                (round(rotated_logo.width * scale_factors[idx]), round(rotated_logo.height * scale_factors[idx])),
+                resample=Image.Resampling.LANCZOS)
+        else:
+            # Additive probability to ensure it happens
+            p_s += np.random.uniform(0, 1)
+            scaled_logo: Image.Image = rotated_logo
         # --- TRANSLATION ---
         if p_t >= 1 - c_params.transform_prob:
-            # Additive probability to ensure it happens
-            p_t += np.random.uniform(0, 1)
+            # Reset probability to a random value
+            p_t = np.random.uniform(0, 1)
             x_tl_after: float = x_tl + t_xs[idx]
             y_tl_after: float = y_tl + t_ys[idx]
         else:
-            # Reset probability to a random value
-            p_t = np.random.uniform(0, 1)
+            # Additive probability to ensure it happens
+            p_t += np.random.uniform(0, 1)
             x_tl_after: float = x_tl
             y_tl_after: float = y_tl
-
         # NOTE: Is there a way to do it float?
         # NOTE: Not really...
         # Putting logos onto the canvas with random transformations and random noise
-        background.paste(scaled_logo, (round(x_tl_after + c_params.spacing / 2),
-                                       round(y_tl_after + c_params.spacing / 2)),
-                         scaled_logo)
+        x = round(x_tl_after + c_params.spacing / 2)
+        y = round(y_tl_after + c_params.spacing / 2)
+        background.paste(scaled_logo, (x, y), scaled_logo)
 
         # Store the center points before and after translation
-        center_points_after.append((x_tl_after + scaled_logo.width / 2,
-                                    y_tl_after + scaled_logo.height / 2))
+        center_points_after.append((x + scaled_logo.width / 2,
+                                    y + scaled_logo.height / 2))
+
+        # Gaussian noise to the logo
+        # --- NOISE ---
+        if p_n >= 1 - c_params.transform_prob:
+            # Reset probability to a random value
+            p_n = np.random.uniform(0, 1)
+            background = add_centered_gaussian_noise(background, *center_points_after[-1], shape=scaled_logo.size,
+                                                     noise_amount=noise_amounts[idx])
+        else:
+            # Additive probability to ensure it happens
+            p_n += np.random.uniform(0, 1)
     # ------------------------------------------------------------------------
     # Save center coordinates
     centers_before = pd.DataFrame(center_points_before, columns=["x", "y"])
