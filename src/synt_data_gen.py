@@ -1,9 +1,10 @@
 import time
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import pandas as pd
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 from src.utils.img_utils import calculate_aspect_ratio_fit
 from src.utils.io_utils import load_yaml
@@ -42,6 +43,12 @@ class CanvasParameters:
         # Gaussian noise parameters (basically mean and std)
         self.min_noise: float = parameters_dict["min_noise"]
         self.max_noise: float = parameters_dict["max_noise"]
+
+        self.logo_contrast_min: float = parameters_dict["logo_contrast_min"]
+        self.logo_contrast_max: float = parameters_dict["logo_contrast_max"]
+        self.contrast_min: float = parameters_dict["contrast_min"]
+        self.contrast_max: float = parameters_dict["contrast_max"]
+        self.band_percentage: float = parameters_dict["band_percentage"]
 
         # Background
         self.bg_color = parameters_dict["bg_color"]
@@ -94,7 +101,7 @@ def make_background(c_params, logo):
 def add_centered_gaussian_noise(image, center_x, center_y, shape: tuple[int, int],
                                 noise_amount: float = 100.0):
     # TODO: arbitrary
-    sigma = sum(shape) / 10
+    sigma = sum(shape) / 8
     logo_width, logo_height = shape
     tx = np.random.uniform(- logo_width / 3, logo_width / 3)
     ty = np.random.uniform(- logo_height / 3, logo_height / 3)
@@ -115,6 +122,18 @@ def add_centered_gaussian_noise(image, center_x, center_y, shape: tuple[int, int
     noisy_image_array = np.clip(noisy_image_array, 0, 255)
     noisy_image = Image.fromarray(noisy_image_array.astype(np.uint8))
     return noisy_image
+
+
+def change_contrast_in_bands(image, c_params: CanvasParameters):
+    width, height = image.size
+    band_height = int(height * c_params.band_percentage)
+    for y in range(0, height, band_height):
+        contrast_factor = np.random.uniform(c_params.contrast_min, c_params.contrast_max)
+        box = (0, y, width, min(y + band_height, height))
+        region = image.crop(box)
+        region = region.point(lambda p: p * contrast_factor)
+        image.paste(region, box)
+    return image
 
 
 def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
@@ -166,7 +185,7 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
     p_t, p_r, p_s, p_n = np.random.uniform(0, 1, 4)
     # Generate random Gaussian noise amounts
     noise_amounts: np.ndarray[float] = np.random.uniform(c_params.min_noise, c_params.max_noise,
-                                                  len(top_left_corners_before))
+                                                         len(top_left_corners_before))
     for idx, (x_tl, y_tl) in enumerate(top_left_corners_before):
         # Random transformations
         # --- ROTATE ---
@@ -205,6 +224,12 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
         # Putting logos onto the canvas with random transformations and random noise
         x = round(x_tl_after + c_params.spacing / 2)
         y = round(y_tl_after + c_params.spacing / 2)
+
+        enhancer = ImageEnhance.Contrast(scaled_logo)
+        scaled_logo = enhancer.enhance(np.random.uniform(c_params.logo_contrast_min, c_params.logo_contrast_max))
+
+        # enhancer = ImageEnhance.Brightness(scaled_logo)
+        # scaled_logo = enhancer.enhance(np.random.uniform(0.75, 1.25))
         background.paste(scaled_logo, (x, y), scaled_logo)
 
         # Store the center points before and after translation
@@ -221,6 +246,7 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
         else:
             # Additive probability to ensure it happens
             p_n += np.random.uniform(0, 1)
+    background = change_contrast_in_bands(background, c_params)
     # ------------------------------------------------------------------------
     # Save center coordinates
     centers_before = pd.DataFrame(center_points_before, columns=["x", "y"])
