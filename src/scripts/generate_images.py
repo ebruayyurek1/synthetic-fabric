@@ -135,9 +135,9 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
     background = change_contrast_in_bands(background, c_params)
     # ------------------------------------------------------------------------
     # Save center coordinates
-    centers_before = pd.DataFrame(center_points_before, columns=["x", "y"])
-    # centers_after = pd.DataFrame(center_points_after, columns=["x", "y"])
-    centers_before.to_csv(logo_output_path / f'{c_params.bg_texture.stem}_{image_path.stem}_centers.csv', index=False)
+    # centers_before = pd.DataFrame(center_points_before, columns=["x", "y"])
+    centers_after = pd.DataFrame(center_points_after, columns=["x", "y"])
+    centers_after.to_csv(logo_output_path / f'{c_params.bg_texture.stem}_{image_path.stem}_centers.csv', index=False)
     # centers_after.to_csv(logo_output_path / 'centers_after.csv', index=False)
     #
     background.save(logo_output_path / f'{c_params.bg_texture.stem}_{image_path.stem}_image.png')
