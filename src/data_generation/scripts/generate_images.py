@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 from PIL import Image, ImageEnhance
 
-from src.core.CanvasParameters import CanvasParameters
-from src.core.synt_data_gen import make_background, generate_coordinates, add_centered_gaussian_noise, \
+from src.data_generation.core.CanvasParameters import CanvasParameters
+from src.data_generation.core.synt_data_gen import make_background, generate_coordinates, add_centered_gaussian_noise, \
     change_contrast_in_bands, add_centered_gaussian_blur
 
 
@@ -154,16 +154,16 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
 def main():
     base_path: Path = Path('data')
     # img_names: list[str] = ['tucano.png', 'instagram_logo.png', 'starbucks_logo.png', 'CocaCola_logo.png']
-    bgs = list(Path("data/textures/new").glob('*.jpg'))
-    img_names: list[str] = ['rust.png', 'unive.png', 'python.png', 'golang.png']
+    bgs = [Path("data/textures/new/burlap.jpg")] # list(Path("data/textures/new").glob('*.jpg'))
+    img_names: list[str] = ['python.png']# ['rust.png', 'unive.png', 'python.png', 'golang.png']
     for bg in bgs:
         times = []
         for img_name in img_names:
             canvas_params = CanvasParameters(base_path / 'input' / 'parameters.yaml')
             canvas_params.bg_texture = bg
-            canvas_params.rows = random.randint(2, 6)
+            canvas_params.rows = random.randint(5, 10)
             canvas_params.cols = random.randint(5, 10)
-            canvas_params.spacing = random.randint(200, 600)
+            canvas_params.spacing = random.randint(50, 300)
             canvas_params.interval_skew_fraction = random.uniform(0.0, 0.5)
 
             start = time.perf_counter()

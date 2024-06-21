@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from src.core.CanvasParameters import CanvasParameters
+from src.data_generation.core.CanvasParameters import CanvasParameters
 from src.utils.img_utils import calculate_aspect_ratio_fit
 
 
