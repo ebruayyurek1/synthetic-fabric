@@ -15,14 +15,11 @@ def generate_coordinates(width: int, height: int,
     # Calculate interval sizes
     x_interval = width / width_intervals
     y_interval = height / height_intervals
-
     coordinates = []
     for j in range(height_intervals):
         skew = 0 if j % 2 == 0 else interval_skew_fraction * x_interval
-        # - j % 2 removes one on the skewed row
-        for i in range(width_intervals - (j % 2 if interval_skew_fraction > 0.1 else 0)):
+        for i in range(width_intervals):
             coordinates.append((int(i * x_interval + skew), int(j * y_interval)))
-
     return coordinates
 
 

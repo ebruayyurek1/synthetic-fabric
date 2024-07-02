@@ -1,4 +1,3 @@
-from PIL import ImageDraw
 import random
 import time
 from pathlib import Path
@@ -6,10 +5,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageEnhance
+from PIL import ImageDraw
 
 from src.data_generation.core.CanvasParameters import CanvasParameters
 from src.data_generation.core.synt_data_gen import make_background, generate_coordinates, add_centered_gaussian_noise, \
     change_contrast_in_bands, add_centered_gaussian_blur
+from src.utils.io_utils import dump_yaml
 
 
 def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
@@ -19,6 +20,7 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
     image_path: Path = (main_folder / 'input' / input_img_name)
     # Load image
     logo: Image.Image = Image.open(main_folder / 'input' / input_img_name).convert('RGBA')
+
     # Create output folder
     logo_output_path: Path = base_output_path / image_path.stem
     logo_output_path.mkdir(parents=True, exist_ok=True)
@@ -35,7 +37,7 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
 
     for x, y in centers_before:
         # Put in the middle of spacing
-        x_tl_w_space, y_tl_w_space = (round(x - cell_width/2), round(y - cell_height/2))
+        x_tl_w_space, y_tl_w_space = (round(x - cell_width / 2), round(y - cell_height / 2))
         # box: 2-tuple giving the upper left corner
         original_canvas.paste(logo, (x_tl_w_space, y_tl_w_space), logo)
         # save (floating point) centers
@@ -137,41 +139,97 @@ def run(main_folder: Path, input_img_name: str, c_params: CanvasParameters):
     # Save center coordinates
     # centers_before = pd.DataFrame(center_points_before, columns=["x", "y"])
     centers_after = pd.DataFrame(center_points_after, columns=["x", "y"])
-    centers_after.to_csv(logo_output_path / f'{c_params.bg_texture.stem}_{image_path.stem}_centers.csv', index=False)
+    # centers_after.to_csv(logo_output_path / f'{c_params.bg_texture.stem}_{image_path.stem}_centers.csv', index=False)
+    centers_after.to_csv(logo_output_path / f'centers.csv', index=False)
     # centers_after.to_csv(logo_output_path / 'centers_after.csv', index=False)
     #
-    background.save(logo_output_path / f'{c_params.bg_texture.stem}_{image_path.stem}_image.png')
+    # background.save(logo_output_path / f'{c_params.bg_texture.stem}_{image_path.stem}_image.png')
 
+    background.save(logo_output_path / f'material.bmp')
+
+    major_side = max(logo.width, logo.height)
+    template = Image.open(c_params.bg_texture)
+    template = template.crop((0, 0, major_side, major_side)).convert("RGBA")
+
+    if logo.width > logo.height:
+        # more width
+        template.paste(logo, (0, (logo.width - logo.height) // 2), logo)
+    elif logo.width < logo.height:
+        # more height
+        template.paste(logo, ((logo.height - logo.width) // 2, 0),  logo)
+    else:
+        template.paste(logo, (0,0), logo)
+    template.save(logo_output_path / f"initial_template.png")
     # DEBUG
-    draw = ImageDraw.Draw(background)
-    for (x, y) in center_points_after:
-        draw.rectangle((x - 10, y - 10, x + 10, y + 10), outline='red', fill="white")
-        draw.point((x, y), fill="red")
+    # draw = ImageDraw.Draw(background)
+    # for (x, y) in center_points_after:
+    #     draw.rectangle((x - 10, y - 10, x + 10, y + 10), outline='red', fill="white")
+    #     draw.point((x, y), fill="red")
+
+    height_point, center, width_point = center_points_after[0], center_points_after[c_params.cols], center_points_after[
+        c_params.cols + 1]
+
+    # -- PARAMS --
+    from math import dist
+    dist1 = dist(center, width_point)
+    dist2 = dist(center, height_point)
+    diff_x1, diff_y1 = abs(center[0] - width_point[0]), abs(center[1] - width_point[1])
+    diff_x2, diff_y2 = abs(center[0] - height_point[0]), abs(center[1] - height_point[1])
+    angle1 = float(np.arctan2(diff_y1, diff_x1))  # Angle w.r.t. axis x
+    angle2 = -float(np.arctan2(diff_y2, diff_x2))
+    radius = round(max(logo.width, logo.height) / 2)
+
+    params = {
+        "angle1": angle1,
+        "angle2": angle2,
+        "center": (round(center[0]), round(center[1])),
+        "dist1": dist1,
+        "dist2": dist2,
+        "height_point": (round(height_point[0]), round(height_point[1])),
+        "width_point": (round(width_point[0]), round(width_point[1])),
+        "radius": radius,
+    }
+    dump_yaml(params, logo_output_path / "parameters.yaml")
+    # draw = ImageDraw.Draw(background)
+    # draw.line((center, top), fill=128)
+    # draw.line((center, right), fill=128)
+    #
+    # plt.imshow(background)
+    # plt.show()
     # write to stdout
-    background.save(logo_output_path / f'{c_params.bg_texture.stem}_{image_path.stem}_debug.png')
+    # background.save(logo_output_path / f'{c_params.bg_texture.stem}_{image_path.stem}_debug.png')
 
 
 def main():
+    data = [("white_leather.jpg", "unive.png"),
+            ("colorful.jpg", "rust.png"),
+            ("black_leather.jpg", "golang.png"),
+            ("burlap.jpg", "python.png"),
+            ("velvet.jpg", "java.png"), ]
     base_path: Path = Path('data')
-    # img_names: list[str] = ['tucano.png', 'instagram_logo.png', 'starbucks_logo.png', 'CocaCola_logo.png']
-    bgs = [Path("data/textures/new/burlap.jpg")] # list(Path("data/textures/new").glob('*.jpg'))
-    img_names: list[str] = ['python.png']# ['rust.png', 'unive.png', 'python.png', 'golang.png']
-    for bg in bgs:
+    bgs = Path("data/textures/new")
+    for idx, (bg, logo) in enumerate(data):
+        print(bg, logo)
+        bg = bgs / bg
         times = []
-        for img_name in img_names:
-            canvas_params = CanvasParameters(base_path / 'input' / 'parameters.yaml')
-            canvas_params.bg_texture = bg
-            canvas_params.rows = random.randint(5, 10)
-            canvas_params.cols = random.randint(5, 10)
-            canvas_params.spacing = random.randint(50, 300)
-            canvas_params.interval_skew_fraction = random.uniform(0.0, 0.5)
+        canvas_params = CanvasParameters(base_path / 'input' / 'parameters.yaml')
+        canvas_params.bg_texture = bg
+        if idx < 3:
+            canvas_params.rows = random.randint(6, 8)
+            canvas_params.cols = random.randint(10, 12)
+        else:
+            canvas_params.rows = random.randint(10, 12)
+            canvas_params.cols = random.randint(6, 8)
+            canvas_params.skew = 0.1
+        canvas_params.spacing = random.randint(120, 170)
+        #
 
-            start = time.perf_counter()
-            run(main_folder=base_path,
-                input_img_name=img_name,
-                c_params=canvas_params)
-            times.append(time.perf_counter() - start)
-            print(f"{img_name}", sep=" ")
+        start = time.perf_counter()
+        run(main_folder=base_path,
+            input_img_name=logo,
+            c_params=canvas_params)
+        times.append(time.perf_counter() - start)
+        print(f"{logo}", sep=" ")
         print(f'Average time elapsed for "{bg.stem}": {np.average(times):.2f}s')
 
 
