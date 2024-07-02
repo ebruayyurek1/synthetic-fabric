@@ -1,8 +1,11 @@
 # Import Python Standard Library dependencies
 import datetime
 import json
+# import linecache
 import multiprocessing
+import os
 import random
+# import tracemalloc
 from functools import partial
 from pathlib import Path
 
@@ -31,15 +34,14 @@ from torchvision.tv_tensors import BoundingBoxes, Mask
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 from tqdm.auto import tqdm
 
-from src.methods.train_utils import train_loop
+from src.methods.mask_rcnn.train_utils import train_loop
 from src.utils.io_utils import load_yaml
-from windows_utils import LabelMeDataset
-from windows_utils import create_polygon_mask
-from windows_utils import tuple_batch
+from windows_utils import LabelMeDataset, create_polygon_mask, tuple_batch
 
 
 def main():
     # --- INIT ---
+    # tracemalloc.start()
     config: dict = load_yaml("configs/train_params.yml")
     dataset_dir, project_dir = seed_and_prepare_folders(config)
     dataset_path = Path(f'{dataset_dir}/{config["train_ds"]}/')
@@ -146,7 +148,7 @@ def main():
 
     random.shuffle(img_keys)
 
-    train_pct = 0.8
+    train_pct = 1 - config['val_split']
     train_split = int(len(img_keys) * train_pct)
     train_keys = img_keys[:train_split]
     val_keys = img_keys[train_split:]
@@ -290,7 +292,10 @@ def main():
     lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer,
                                                        max_lr=config['lr'],
                                                        total_steps=config['epochs'] * len(train_dataloader))
-
+    #
+    # snapshot = tracemalloc.take_snapshot()
+    # display_top(snapshot)
+    # quit()
     train_loop(model=model,
                train_dataloader=train_dataloader,
                valid_dataloader=valid_dataloader,
@@ -381,6 +386,31 @@ def try_one_val_img(annotation_df, class_names, config, device, draw_bboxes, img
     plt.show()
 
 
+
+# def display_top(snapshot, key_type='lineno', limit=3):
+#     snapshot = snapshot.filter_traces((
+#         tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+#         tracemalloc.Filter(False, "<unknown>"),
+#     ))
+#     top_stats = snapshot.statistics(key_type)
+#
+#     print("Top %s lines" % limit)
+#     for index, stat in enumerate(top_stats[:limit], 1):
+#         frame = stat.traceback[0]
+#         # replace "/path/to/module/file.py" with "module/file.py"
+#         filename = os.sep.join(frame.filename.split(os.sep)[-2:])
+#         print("#%s: %s:%s: %.1f KiB"
+#               % (index, filename, frame.lineno, stat.size / 1024))
+#         line = linecache.getline(frame.filename, frame.lineno).strip()
+#         if line:
+#             print('    %s' % line)
+#
+#     other = top_stats[limit:]
+#     if other:
+#         size = sum(stat.size for stat in other)
+#         print("%s other: %.1f KiB" % (len(other), size / 1024))
+#     total = sum(stat.size for stat in top_stats)
+#     print("Total allocated size: %.1f KiB" % (total / 1024))
 def seed_and_prepare_folders(config):
     set_seed(config['seed'])
     if not Path(config['font_file']).exists():

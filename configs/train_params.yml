@@ -6,6 +6,7 @@ font_file: 'data/roboto.ttf'
 # Train params
 seed: 1234
 img_size: 512
+val_split: 0.2
 
 model_name: 'maskrcnn_resnet50_fpn_v2'
 batch_size: 16
