@@ -114,8 +114,8 @@ def main():
     # Example usage:
     matching_method = "SIFT"  # "SIFT" or "ORB"
 
-    img1 = cv2.imread("datasets/new_test_imgs/java/image.png", cv2.IMREAD_GRAYSCALE)  # Image
-    template = cv2.imread("datasets/new_test_imgs/java/initial_template.png", cv2.IMREAD_GRAYSCALE)  # Template
+    img1 = cv2.imread("data_synth/java/material.bmp", cv2.IMREAD_GRAYSCALE)  # Image
+    template = cv2.imread("data_synth/java/initial_template.png", cv2.IMREAD_GRAYSCALE)  # Template
 
     params = {
         'max_matching_objects': 150,
@@ -132,9 +132,6 @@ def main():
 
     plt.imshow(img1)
     plt.show()
-
-    # %%
-
 
 if __name__ == '__main__':
     main()
